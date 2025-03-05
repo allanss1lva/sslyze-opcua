@@ -108,7 +108,7 @@ def main() -> None:
             f'    Checking results against Mozilla\'s "{parsed_command_line.check_against_mozilla_config}"'
             f" configuration. See https://ssl-config.mozilla.org/ for more details.\n"
         )
-        mozilla_checker = MozillaTlsConfigurationChecker.get_default()
+        mozilla_checker = MozillaTlsConfigurationChecker.create_from_commandline(parsed_command_line.custom_tls_profile)
         for server_scan_result in all_server_scan_results:
             try:
                 mozilla_checker.check_server(

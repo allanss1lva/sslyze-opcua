@@ -1,3 +1,5 @@
+import json
+import pydantic
 from dataclasses import dataclass
 from argparse import ArgumentParser
 from pathlib import Path
@@ -12,6 +14,7 @@ from sslyze.cli.server_string_parser import (
 )
 from sslyze.connection_helpers.opportunistic_tls_helpers import ProtocolWithOpportunisticTlsEnum
 from sslyze.mozilla_tls_profile.mozilla_config_checker import (
+    _MozillaTlsProfileAsJson,
     MozillaTlsConfigurationEnum,
     SCAN_COMMANDS_NEEDED_BY_MOZILLA_CHECKER,
 )
@@ -64,6 +67,9 @@ class ParsedCommandLine:
     per_server_concurrent_connections_limit: Optional[int]
     concurrent_server_scans_limit: Optional[int]
 
+    # Store the parsed profile object instead of just the path
+    custom_tls_profile: Optional[_MozillaTlsProfileAsJson]
+
     # Mozilla compliance; None if shouldn't be run
     check_against_mozilla_config: Optional[MozillaTlsConfigurationEnum]
 
@@ -98,6 +104,15 @@ class CommandLineParser:
                 action=scan_option.action,
             )
 
+        # Add custom TLS profile option
+        self._parser.add_argument(
+            "--custom_profile",
+            help="Path to a custom TLS profile JSON file following Mozilla's format",
+            dest="custom_profile",
+            type=str,
+            default=None
+        )
+
         self._parser.add_argument(
             "--mozilla_config",
             action="store",
@@ -119,6 +134,20 @@ class CommandLineParser:
             # Just update the trust stores and do nothing
             TrustStoresRepository.update_default()
             raise TrustStoresUpdateCompleted()
+
+        # Handle custom profile if provided
+        custom_tls_profile = None
+        if args_command_list.custom_profile:
+                json_profile_path = Path(args_command_list.custom_profile).absolute()
+                if not json_profile_path.exists():
+                    raise CommandLineParsingError(f"Custom TLS profile file '{json_profile_path}' does not exist")
+                try:
+                    json_profile_as_str = json_profile_path.read_text()
+                    custom_tls_profile = _MozillaTlsProfileAsJson(**json.loads(json_profile_as_str))
+                except (ValueError, pydantic.ValidationError) as e:
+                    raise CommandLineParsingError(
+                        f"Invalid custom TLS profile format in '{json_profile_path}': {str(e)}"
+                    )
 
         # Handle the --targets_in command line and fill args_target_list
         if args_command_list.targets_in:
@@ -318,6 +347,7 @@ class CommandLineParser:
             should_disable_console_output=args_command_list.quiet or args_command_list.json_file == "-",
             concurrent_server_scans_limit=concurrent_server_scans_limit,
             per_server_concurrent_connections_limit=per_server_concurrent_connections_limit,
+            custom_tls_profile=custom_tls_profile,
             check_against_mozilla_config=check_against_mozilla_config,
         )
 
