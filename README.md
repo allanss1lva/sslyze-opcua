@@ -18,7 +18,7 @@ Key features
 * Focus on speed and reliability: SSLyze is a battle-tested tool that is used to reliably scan **hundreds of thousands**
 of servers every day.
 * Easy to operationalize: SSLyze can be directly run from CI/CD, in order to continuously check a server against 
-Mozilla's recommended TLS configuration.
+Mozilla's recommended TLS configurations.
 * Fully documented [Python API](https://nabla-c0d3.github.io/sslyze/documentation/) to run scans directly from any
 Python application, such as a function deployed to AWS Lambda.
 * Support for scanning non-HTTP servers including SMTP, XMPP, LDAP, POP, IMAP, RDP, Postgres and FTP servers.

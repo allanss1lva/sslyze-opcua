@@ -104,7 +104,7 @@ class CommandLineParser:
             dest="mozilla_config",
             choices=[config.value for config in MozillaTlsConfigurationEnum] + ["disable"],
             help="Shortcut to queue various scan commands needed to check the server's TLS configurations against one"
-            ' of Mozilla\'s recommended TLS configuration. Set to "intermediate" by default. Use "disable" to disable'
+            ' of Mozilla\'s recommended TLS configurations. Set to "intermediate" by default. Use "disable" to disable'
             " this check.",
         )
 
@@ -425,7 +425,7 @@ class CommandLineParser:
             help="Perform a StartTLS handshake when connecting to the target server(s). "
             f"StartTLS should be one of: auto, {', '.join(_STARTTLS_PROTOCOL_DICT.keys())}. The "
             "'auto' option will cause SSLyze to deduce the protocol (ftp, imap, etc.) from the "
-            "supplied port number, for each target servers.",
+            "supplied port number, for each target server.",
             dest="starttls",
             default=None,
         )
