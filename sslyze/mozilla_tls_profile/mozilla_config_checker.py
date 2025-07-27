@@ -29,13 +29,14 @@ class _MozillaCiphersAsJson(pydantic.BaseModel):
     openssl: Set[str]
 
 
-
 # ANSI X9.62 name (used by the Mozilla TLS profiles) -> SECG name
 # Based on https://www.rfc-editor.org/rfc/rfc8422.html#appendix-A
 _MOZILLA_CURVE_NAME_TO_SECG_CURVE_NAME = {
     "prime256v1": "secp256r1",
     "prime192v1": "secp192r1",
 }
+
+
 def _convert_mozilla_curve_name_to_secg_name(mozilla_curves: Set[str]) -> Set[str]:
     # Some curves use the ANSI X9.62 name in the Mozilla TLS profiles; convert the names to SECG names
     mozilla_curves_secg_names = set()
@@ -45,7 +46,7 @@ def _convert_mozilla_curve_name_to_secg_name(mozilla_curves: Set[str]) -> Set[st
         except KeyError:
             final_curve_name = curve_name
         mozilla_curves_secg_names.add(final_curve_name)
-        
+
     return mozilla_curves_secg_names
 
 
@@ -191,8 +192,6 @@ class MozillaTlsConfigurationChecker:
                 mozilla_config=against_config,
                 issues=all_issues,
             )
-
-
 
 
 def _check_tls_curves(

@@ -216,3 +216,21 @@ class TestCertificateInfoPlugin:
             # When running the scan, it succeeds
             plugin_result = CertificateInfoImplementation.scan_server(server_info)
             assert plugin_result.certificate_deployments[0].received_certificate_chain
+
+    def test_includes_non_sni_certificate(self):
+        # Given a server to scan that supports SNI but also returns a specific cert when SNI is not used by the client
+        server_location = ServerNetworkLocation("www.google.com", 443)
+        server_info = check_connectivity_to_server_and_return_info(server_location)
+
+        # When running the scan, it succeeds
+        plugin_result = CertificateInfoImplementation.scan_server(server_info)
+
+        # And the SNI-enabled certificate deployments should NOT contain the no-SNI certificate
+        for cert_deployment in plugin_result.certificate_deployments:
+            leaf_cert = cert_deployment.received_certificate_chain[0]
+            assert "No SNI provided" not in leaf_cert.subject.rfc4514_string()
+
+        # And the non-SNI certificate deployment should be separate and contain the Google no-SNI certificate
+        assert plugin_result.certificate_deployment_with_sni_disabled is not None
+        non_sni_cert = plugin_result.certificate_deployment_with_sni_disabled.received_certificate_chain[0]
+        assert "No SNI provided" in non_sni_cert.subject.rfc4514_string()
