@@ -1,7 +1,7 @@
 import json
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Set, Dict
+from typing import Annotated, Optional, Set, Dict
 
 import pydantic
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
@@ -29,8 +29,28 @@ class _MozillaCiphersAsJson(pydantic.BaseModel):
     openssl: Set[str]
 
 
+
+# ANSI X9.62 name (used by the Mozilla TLS profiles) -> SECG name
+# Based on https://www.rfc-editor.org/rfc/rfc8422.html#appendix-A
+_MOZILLA_CURVE_NAME_TO_SECG_CURVE_NAME = {
+    "prime256v1": "secp256r1",
+    "prime192v1": "secp192r1",
+}
+def _convert_mozilla_curve_name_to_secg_name(mozilla_curves: Set[str]) -> Set[str]:
+    # Some curves use the ANSI X9.62 name in the Mozilla TLS profiles; convert the names to SECG names
+    mozilla_curves_secg_names = set()
+    for curve_name in mozilla_curves:
+        try:
+            final_curve_name = _MOZILLA_CURVE_NAME_TO_SECG_CURVE_NAME[curve_name]
+        except KeyError:
+            final_curve_name = curve_name
+        mozilla_curves_secg_names.add(final_curve_name)
+        
+    return mozilla_curves_secg_names
+
+
 class _MozillaTlsConfigurationAsJson(pydantic.BaseModel):
-    certificate_curves: Set[str]
+    certificate_curves: Annotated[Set[str], pydantic.AfterValidator(_convert_mozilla_curve_name_to_secg_name)]
     certificate_signatures: Set[str]
     certificate_types: Set[str]
     ciphersuites: Set[str]
@@ -43,7 +63,7 @@ class _MozillaTlsConfigurationAsJson(pydantic.BaseModel):
     recommended_certificate_lifespan: int
     rsa_key_size: Optional[int]
     server_preferred_order: bool
-    tls_curves: Set[str]
+    tls_curves: Annotated[Set[str], pydantic.AfterValidator(_convert_mozilla_curve_name_to_secg_name)]
     tls_versions: Set[str]
 
 
@@ -171,6 +191,8 @@ class MozillaTlsConfigurationChecker:
                 mozilla_config=against_config,
                 issues=all_issues,
             )
+
+
 
 
 def _check_tls_curves(
