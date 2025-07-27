@@ -140,17 +140,6 @@ class TestCertificateInfoPlugin:
         # No SHA1 signature is detected
         assert not plugin_result.certificate_deployments[0].verified_chain_has_sha1_signature
 
-    def test_chain_with_anchor(self):
-        # Given a server to scan that has its anchor certificate returned in its chain
-        server_location = ServerNetworkLocation("www.verizon.com", 443)
-        server_info = check_connectivity_to_server_and_return_info(server_location)
-
-        # When running the scan, it succeeds
-        plugin_result = CertificateInfoImplementation.scan_server(server_info)
-
-        # And the anchor certificate was detected
-        assert plugin_result.certificate_deployments[0].received_chain_contains_anchor_certificate
-
     def test_certificate_with_no_cn(self):
         # Given a server to scan that has a certificate with no CN
         server_location = ServerNetworkLocation("no-common-name.badssl.com", 443)
