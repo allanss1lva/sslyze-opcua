@@ -1,4 +1,3 @@
-import json
 import pydantic
 from dataclasses import dataclass
 from argparse import ArgumentParser
@@ -13,9 +12,10 @@ from sslyze.cli.server_string_parser import (
     CommandLineServerStringParser,
 )
 from sslyze.connection_helpers.opportunistic_tls_helpers import ProtocolWithOpportunisticTlsEnum
-from sslyze.mozilla_tls_profile.mozilla_config_checker import (
-    _MozillaTlsProfileAsJson,
-    MozillaTlsConfigurationEnum,
+from sslyze.mozilla_tls_profile.tls_config_checker import (
+    TlsConfigurationAsJson,
+    MozillaTlsConfiguration,
+    TlsConfigurationEnum,
     SCAN_COMMANDS_NEEDED_BY_MOZILLA_CHECKER,
 )
 from sslyze.plugins import plugin_base
@@ -67,11 +67,9 @@ class ParsedCommandLine:
     per_server_concurrent_connections_limit: Optional[int]
     concurrent_server_scans_limit: Optional[int]
 
-    # Store the parsed profile object instead of just the path
-    custom_tls_profile: Optional[_MozillaTlsProfileAsJson]
-
-    # Mozilla compliance; None if shouldn't be run
-    check_against_mozilla_config: Optional[MozillaTlsConfigurationEnum]
+    # Check the server against a specific TLS configuration
+    tls_config_to_check_against_as_enum: Optional[TlsConfigurationEnum]  # None if shouldn't be run
+    tls_config_to_check_against: Optional[TlsConfigurationAsJson]
 
 
 _STARTTLS_PROTOCOL_DICT = {
@@ -106,18 +104,18 @@ class CommandLineParser:
 
         # Add custom TLS profile option
         self._parser.add_argument(
-            "--custom_profile",
-            help="Path to a custom TLS profile JSON file following Mozilla's format",
-            dest="custom_profile",
+            "--custom_tls_config",
+            help="Path to a JSON file containing a specific TLS configuration to check the server against, following Mozilla's format. Cannot be used with --mozilla_config.",
+            dest="custom_tls_config",
             type=str,
-            default=None
+            default=None,
         )
 
         self._parser.add_argument(
             "--mozilla_config",
             action="store",
             dest="mozilla_config",
-            choices=[config.value for config in MozillaTlsConfigurationEnum] + ["disable"],
+            choices=["modern", "intermediate", "old", "disable"],
             help="Shortcut to queue various scan commands needed to check the server's TLS configurations against one"
             ' of Mozilla\'s recommended TLS configurations. Set to "intermediate" by default. Use "disable" to disable'
             " this check.",
@@ -134,20 +132,6 @@ class CommandLineParser:
             # Just update the trust stores and do nothing
             TrustStoresRepository.update_default()
             raise TrustStoresUpdateCompleted()
-
-        # Handle custom profile if provided
-        custom_tls_profile = None
-        if args_command_list.custom_profile:
-                json_profile_path = Path(args_command_list.custom_profile).absolute()
-                if not json_profile_path.exists():
-                    raise CommandLineParsingError(f"Custom TLS profile file '{json_profile_path}' does not exist")
-                try:
-                    json_profile_as_str = json_profile_path.read_text()
-                    custom_tls_profile = _MozillaTlsProfileAsJson(**json.loads(json_profile_as_str))
-                except (ValueError, pydantic.ValidationError) as e:
-                    raise CommandLineParsingError(
-                        f"Invalid custom TLS profile format in '{json_profile_path}': {str(e)}"
-                    )
 
         # Handle the --targets_in command line and fill args_target_list
         if args_command_list.targets_in:
@@ -166,8 +150,47 @@ class CommandLineParser:
         if not args_target_list:
             raise CommandLineParsingError("No targets to scan.")
 
-        # Handle the case when no scan commands have been specified: run --mozilla-config=intermediate by default
-        if not args_command_list.mozilla_config:
+        if args_command_list.custom_tls_config and args_command_list.mozilla_config:
+            raise CommandLineParsingError(
+                "Cannot use --custom_tls_config and --mozilla_config. Please specify one of the two."
+            )
+
+        # Determine the TLS configuration to check against
+        tls_config_to_check_against_as_enum: Optional[TlsConfigurationEnum] = None
+        tls_config_to_check_against: Optional[TlsConfigurationAsJson] = None
+        if args_command_list.custom_tls_config:
+            # A custom TLS config was supplied
+            tls_config_to_check_against_as_enum = TlsConfigurationEnum.CUSTOM
+            json_tls_config_path = Path(args_command_list.custom_tls_config).absolute()
+            if not json_tls_config_path.exists():
+                raise CommandLineParsingError(f"Custom TLS profile file '{json_tls_config_path}' does not exist")
+            try:
+                tls_config_to_check_against = TlsConfigurationAsJson.model_validate_json(
+                    json_tls_config_path.read_text()
+                )
+            except pydantic.ValidationError:
+                raise CommandLineParsingError(f"Could not parse custom TLS configuration file '{json_tls_config_path}'")
+
+        elif args_command_list.mozilla_config:
+            # A Mozilla config was specified
+            mozilla_config_map = {
+                "modern": TlsConfigurationEnum.MOZILLA_MODERN,
+                "intermediate": TlsConfigurationEnum.MOZILLA_INTERMEDIATE,
+                "old": TlsConfigurationEnum.MOZILLA_OLD,
+                "disable": None,  # Disable the Mozilla TLS configuration check
+            }
+            try:
+                tls_config_to_check_against_as_enum = mozilla_config_map[args_command_list.mozilla_config]
+            except KeyError:
+                raise CommandLineParsingError(f"Unknown value for --mozilla_config: {args_command_list.mozilla_config}")
+
+            if tls_config_to_check_against_as_enum is not None:
+                # Load the corresponding Mozilla TLS configuration
+                tls_config_to_check_against = MozillaTlsConfiguration.get(tls_config_to_check_against_as_enum)
+
+        else:
+            # Handle the case when no value was specified: run --mozilla-config=intermediate by default
+            # First check if the user was specific about which scan commands to run
             did_user_enable_some_scan_commands = False
             for scan_command in ScanCommandsRepository.get_all_scan_commands():
                 cli_connector_cls = ScanCommandsRepository.get_implementation_cls(scan_command).cli_connector_cls
@@ -176,17 +199,14 @@ class CommandLineParser:
                     did_user_enable_some_scan_commands = True
                     break
 
+            # If the user did not specify any scan commands, run the default scan commands
+            #  and check the result against the Mozilla intermediate configuration
             if not did_user_enable_some_scan_commands:
-                setattr(args_command_list, "mozilla_config", MozillaTlsConfigurationEnum.INTERMEDIATE.value)
+                tls_config_to_check_against_as_enum = TlsConfigurationEnum.MOZILLA_INTERMEDIATE
+                tls_config_to_check_against = MozillaTlsConfiguration.get(tls_config_to_check_against_as_enum)
 
-        # Enable the commands needed by --mozilla-config
-        check_against_mozilla_config: Optional[MozillaTlsConfigurationEnum] = None
-        if args_command_list.mozilla_config:
-            if args_command_list.mozilla_config == "disable":
-                check_against_mozilla_config = None
-            else:
-                check_against_mozilla_config = MozillaTlsConfigurationEnum(args_command_list.mozilla_config)
-
+        # Enable the commands needed by TLS configuration checking
+        if tls_config_to_check_against_as_enum:
             for scan_cmd in SCAN_COMMANDS_NEEDED_BY_MOZILLA_CHECKER:
                 cli_connector_cls = ScanCommandsRepository.get_implementation_cls(scan_cmd).cli_connector_cls
                 setattr(args_command_list, cli_connector_cls._cli_option, True)
@@ -347,8 +367,8 @@ class CommandLineParser:
             should_disable_console_output=args_command_list.quiet or args_command_list.json_file == "-",
             concurrent_server_scans_limit=concurrent_server_scans_limit,
             per_server_concurrent_connections_limit=per_server_concurrent_connections_limit,
-            custom_tls_profile=custom_tls_profile,
-            check_against_mozilla_config=check_against_mozilla_config,
+            tls_config_to_check_against_as_enum=tls_config_to_check_against_as_enum,
+            tls_config_to_check_against=tls_config_to_check_against,
         )
 
     def _add_default_options(self) -> None:

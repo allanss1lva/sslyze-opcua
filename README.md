@@ -82,7 +82,20 @@ mozilla.com:443: FAILED - Not compliant.
     * ciphers: Cipher suites {'TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384', 'TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256', 'TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256'} are supported, but should be rejected.
 ```
 
-This can be used to easily run an SSLyze scan as a CI/CD step.
+Alternatively, you can check against your own custom TLS configuration by providing a JSON file that follows Mozilla's TLS configuration format:
+
+```
+$ python -m sslyze --custom_tls_config custom_tls_config_example.json mozilla.com
+```
+```
+Checking results against custom TLS configuration.
+
+mozilla.com:443: OK - Compliant.
+```
+
+See `custom_tls_config_example.json` for an example a custom TLS configuration that can be used by SSLyze.
+
+**This functionality can be used to easily run an SSLyze scan as a CI/CD step in order to ensure TLS compliance.**
 
 Development environment
 -----------------------
