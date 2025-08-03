@@ -96,6 +96,9 @@ class ServerNotCompliantWithTlsConfiguration(Exception):
         self.tls_configuration = tls_configuration
         self.issues = issues
 
+    def __str__(self) -> str:
+        return f"Server is not compliant with the supplied TLS configuration due to: {self.issues}"
+
 
 class ServerScanResultIncomplete(Exception):
     """The server scan result does not have enough information to check it against Mozilla's configuration."""

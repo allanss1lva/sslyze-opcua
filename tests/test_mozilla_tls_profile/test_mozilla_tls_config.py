@@ -97,7 +97,7 @@ class TestMozillaTlsConfigurationChecker:
     def test_solo_cert_deployment_compliant_with_old(self):
         # Given the scan results for a server that is compliant with the "old" Mozilla config
         scanner = Scanner()
-        scanner.queue_scans([ServerScanRequest(server_location=ServerNetworkLocation(hostname="www.google.com"))])
+        scanner.queue_scans([ServerScanRequest(server_location=ServerNetworkLocation(hostname="www.mozilla.com"))])
         server_scan_result = next(scanner.get_results())
 
         # When checking if the server is compliant with the Mozilla "old" TLS config
