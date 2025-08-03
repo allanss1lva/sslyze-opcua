@@ -131,6 +131,15 @@ class MozillaTlsConfigurationChecker:
         parsed_profile = _MozillaTlsProfileAsJson(**json.loads(json_profile_as_str))
         return cls(parsed_profile)
 
+    @classmethod
+    def create_from_commandline(
+        cls, custom_profile: Optional[_MozillaTlsProfileAsJson] = None
+    ) -> "MozillaTlsConfigurationChecker":
+        """Create a checker instance using either the default or custom profile."""
+        if custom_profile:
+            return cls(custom_profile)
+        return cls.get_default()
+
     def check_server(
         self,
         against_config: MozillaTlsConfigurationEnum,
