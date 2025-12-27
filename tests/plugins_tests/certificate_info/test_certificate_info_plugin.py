@@ -222,3 +222,18 @@ class TestCertificateInfoPlugin:
         assert plugin_result.certificate_deployment_with_sni_disabled is not None
         non_sni_cert = plugin_result.certificate_deployment_with_sni_disabled.received_certificate_chain[0]
         assert "No SNI provided" in non_sni_cert.subject.rfc4514_string()
+
+    def test_server_rejects_non_sni_handshake(self):
+        # https://github.com/nabla-c0d3/sslyze/pull/706
+        # Given a server to scan that will return a TLS alert "unrecognized name" when receiving a handshake with no SNI
+        server_location = ServerNetworkLocation("internet.nl", 443)
+        server_info = check_connectivity_to_server_and_return_info(server_location)
+
+        # When running the scan, it succeeds
+        plugin_result = CertificateInfoImplementation.scan_server(server_info)
+
+        # And the SNI-enabled certificate deployment has been detected
+        assert plugin_result.certificate_deployments
+
+        # And there is no non-SNI certificate deployment
+        assert plugin_result.certificate_deployment_with_sni_disabled is None

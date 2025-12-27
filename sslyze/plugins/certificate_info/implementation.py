@@ -127,6 +127,13 @@ class CertificateInfoImplementation(ScanCommandImplementation[CertificateInfoSca
                 # or when connectivity is bad
                 all_handshake_failed_exceptions.append(exc)
 
+            except nassl._nassl.OpenSSLError as exc:
+                if "unrecognized name" in exc.args[0]:
+                    # Can happen when trying to connect without SNI
+                    all_handshake_failed_exceptions.append(exc)
+                else:
+                    raise
+
             else:
                 if not was_sni_used:
                     # This is the SNI-disabled deployment, we handle it separately
