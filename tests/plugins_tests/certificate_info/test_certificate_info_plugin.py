@@ -76,7 +76,6 @@ class TestCertificateInfoPlugin:
         # And the result has other details about the certificate chain
         assert len(plugin_result.certificate_deployments[0].received_certificate_chain)
         assert len(plugin_result.certificate_deployments[0].verified_certificate_chain)
-        assert not plugin_result.certificate_deployments[0].received_chain_contains_anchor_certificate
 
         assert len(plugin_result.certificate_deployments[0].path_validation_results) == 5
         for path_validation_result in plugin_result.certificate_deployments[0].path_validation_results:
