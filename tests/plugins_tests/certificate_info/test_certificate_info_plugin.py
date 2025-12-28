@@ -7,7 +7,7 @@ from sslyze.plugins.certificate_info.implementation import CertificateInfoImplem
 from sslyze.server_setting import ServerNetworkLocation
 from tests.connectivity_utils import check_connectivity_to_server_and_return_info
 from tests.markers import can_only_run_on_linux_64
-from tests.openssl_server import ModernOpenSslServer, ClientAuthConfigEnum
+from tests.openssl_server import LegacyOpenSslServer, ModernOpenSslServer, ClientAuthConfigEnum
 import pytest
 
 from tests.server_connectivity_tests.test_direct_connection import is_ipv6_available
@@ -237,3 +237,18 @@ class TestCertificateInfoPlugin:
 
         # And there is no non-SNI certificate deployment
         assert plugin_result.certificate_deployment_with_sni_disabled is None
+
+    @can_only_run_on_linux_64
+    def test_server_has_no_certificate(self):
+        # Given a server that only uses ANON cipher suites ie. that does not have a certificate
+        with LegacyOpenSslServer(openssl_cipher_string="aNULL") as server:
+            server_location = ServerNetworkLocation(
+                hostname=server.hostname, port=server.port, ip_address=server.ip_address
+            )
+            server_info = check_connectivity_to_server_and_return_info(server_location)
+
+            # When running the scan, it succeeds
+            plugin_result = CertificateInfoImplementation.scan_server(server_info)
+
+            # And no certificate deployments are returned
+            assert len(plugin_result.certificate_deployments) == 0
