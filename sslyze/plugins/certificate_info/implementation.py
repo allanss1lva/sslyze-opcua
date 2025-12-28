@@ -83,14 +83,15 @@ class CertificateInfoImplementation(ScanCommandImplementation[CertificateInfoSca
             # Get the default certificate chain sent to clients using TLS 1.3
             call_arguments.append((server_info, custom_ca_file, TlsVersionEnum.TLS_1_3, None, True))
 
-            # Get the other certificate chains sent to clients using TLS 1.2 that support or don't support RSA
-            call_arguments.append((server_info, custom_ca_file, TlsVersionEnum.TLS_1_2, "RSA", True))
-            call_arguments.append((server_info, custom_ca_file, TlsVersionEnum.TLS_1_2, "ALL:-RSA", True))
+            # Get the other certificate chains sent to clients using TLS 1.2 that support
+            #  or don't support RSA for authentication
+            call_arguments.append((server_info, custom_ca_file, TlsVersionEnum.TLS_1_2, "aRSA", True))
+            call_arguments.append((server_info, custom_ca_file, TlsVersionEnum.TLS_1_2, "ALL:-aRSA", True))
         else:
-            # Get the certificate chains sent to clients that support or don't support RSA
+            # Get the certificate chains sent to clients that support or don't support RSA for authentication
             call_arguments.append((server_info, custom_ca_file, None, None, True))
-            call_arguments.append((server_info, custom_ca_file, None, "RSA", True))
-            call_arguments.append((server_info, custom_ca_file, None, "ALL:-RSA", True))
+            call_arguments.append((server_info, custom_ca_file, None, "aRSA", True))
+            call_arguments.append((server_info, custom_ca_file, None, "ALL:-aRSA", True))
 
         # Additionally, get the default certificate chain sent to clients without SNI
         call_arguments.append((server_info, custom_ca_file, None, None, False))
