@@ -59,3 +59,7 @@ docs/_build/*
 docs/documentation/_sources/*
 docs/documentation/.doctrees/*
 
+venv/
+*.json
+*.html
+__pycache__/
