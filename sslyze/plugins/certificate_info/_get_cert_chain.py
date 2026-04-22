@@ -1,14 +1,26 @@
 from pathlib import Path
 from typing import List, Optional, Tuple
-
-import nassl
-from nassl.ssl_client import ClientCertificateRequested
-
+import asyncio
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from asyncua import Client
 from sslyze.server_connectivity import ServerConnectivityInfo, TlsVersionEnum
 
 ArgumentsToGetCertificateChain = Tuple[
     ServerConnectivityInfo, Optional[Path], Optional[TlsVersionEnum], Optional[str], bool
 ]
+
+
+async def _get_opcua_certificate(hostname: str, port: int):
+    url = f"opc.tcp://{hostname}:{port}"
+    client = Client(url=url, timeout=5)
+    endpoints = await client.connect_and_get_server_endpoints()
+    for ep in endpoints:
+        cert_der = ep.ServerCertificate
+        if cert_der and len(cert_der) > 0:
+            return x509.load_der_x509_certificate(cert_der, default_backend())
+    raise ValueError("Nenhum certificado encontrado nos endpoints do servidor OPC UA.")
 
 
 def get_certificate_chain(
@@ -17,26 +29,19 @@ def get_certificate_chain(
     tls_version: Optional[TlsVersionEnum],
     openssl_cipher_string: Optional[str],
     should_enable_sni: bool,
-) -> Tuple[List[str], Optional[nassl._nassl.OCSP_RESPONSE], Optional[Path], bool]:
-    ssl_connection = server_info.get_preconfigured_tls_connection(
-        override_tls_version=tls_version, should_enable_server_name_indication=should_enable_sni
-    )
-    if openssl_cipher_string:
-        ssl_connection.ssl_client.set_cipher_list(openssl_cipher_string)
+) -> Tuple[List[str], None, Optional[Path], bool]:
 
-    # Enable OCSP stapling
-    ssl_connection.ssl_client.set_tlsext_status_ocsp()
-
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        ssl_connection.connect()
-        ocsp_response = ssl_connection.ssl_client.get_tlsext_status_ocsp_resp()
-        received_chain_as_pem = ssl_connection.ssl_client.get_received_chain()
-
-    except ClientCertificateRequested:
-        ocsp_response = ssl_connection.ssl_client.get_tlsext_status_ocsp_resp()
-        received_chain_as_pem = ssl_connection.ssl_client.get_received_chain()
-
+        cert = loop.run_until_complete(
+            _get_opcua_certificate(
+                hostname=server_info.server_location.hostname,
+                port=server_info.server_location.port,
+            )
+        )
     finally:
-        ssl_connection.close()
+        loop.close()
 
-    return received_chain_as_pem, ocsp_response, custom_ca_file, should_enable_sni
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+    return [cert_pem], None, custom_ca_file, should_enable_sni

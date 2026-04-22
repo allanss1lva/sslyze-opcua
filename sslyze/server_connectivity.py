@@ -1,3 +1,6 @@
+import asyncio
+from asyncua import Client as OpcUaClient
+
 import socket
 from enum import Enum, unique
 from pathlib import Path
@@ -51,101 +54,29 @@ class ServerTlsProbingResult:
 def check_connectivity_to_server(
     server_location: ServerNetworkLocation, network_configuration: ServerNetworkConfiguration
 ) -> ServerTlsProbingResult:
-    """Attempt to perform a full SSL/TLS handshake with the server.
+    """Verifica conectividade com servidor OPC UA."""
+    
+    async def _check():
+        url = f"opc.tcp://{server_location.hostname}:{server_location.port}"
+        client = OpcUaClient(url=url)
+        await client.connect_sessionless()  # conecta sem CreateSession
+        await client.disconnect_sessionless()
 
-    This method will ensure that the server can be reached, and will also identify one SSL/TLS version and one
-    cipher suite that is supported by the server.
-
-    Args:
-        server_location
-        network_configuration
-
-    Returns:
-        ServerTlsProbingResult
-
-    Raises:
-        ServerConnectivityError: If the server was not reachable or an SSL/TLS handshake could not be completed.
-    """
-    # Try to complete an SSL handshake to figure out the SSL/TLS version and cipher supported by the server
-    tls_detection_result: Optional[_TlsVersionDetectionResult] = None
-
-    # Fist try TLS 1.3
     try:
-        tls_detection_result = _detect_support_for_tls_1_3(
-            server_location=server_location,
-            network_config=network_configuration,
-        )
-    except _TlsVersionNotSupported:
-        pass
-
-    # If TLS 1.3 is not supported, try lower versions of SSL/TLS
-    if tls_detection_result is None:
-        for tls_version in [
-            # Order is important here as we want to detect the highest version of TLS that's supported
-            TlsVersionEnum.TLS_1_2,
-            TlsVersionEnum.TLS_1_1,
-            TlsVersionEnum.TLS_1_0,
-            TlsVersionEnum.SSL_3_0,
-            TlsVersionEnum.SSL_2_0,
-        ]:
-            try:
-                tls_detection_result = _detect_support_for_tls_1_2_or_below(
-                    server_location=server_location,
-                    network_config=network_configuration,
-                    tls_version=tls_version,
-                )
-                break
-            except _TlsVersionNotSupported:
-                # Try the next TLS version
-                pass
-
-    if tls_detection_result is None:
-        raise ServerTlsConfigurationNotSupported(
+        asyncio.run(_check())
+    except Exception as e:
+        raise ConnectionToServerFailed(
             server_location=server_location,
             network_configuration=network_configuration,
-            error_message="TLS probing failed: could not find a TLS version and cipher suite supported by the server",
+            error_message=f"OPC UA connection failed: {e}",
         )
 
-    if tls_detection_result.tls_version_supported == TlsVersionEnum.SSL_2_0:
-        raise ServerTlsConfigurationNotSupported(
-            server_location=server_location,
-            network_configuration=network_configuration,
-            error_message="WARNING: Server only supports SSL 2.0 and is therefore affected by critical vulnerabilities."
-            " Update the server's software as soon as possible.",
-        )
-
-    # If the server requested a client certificate, detect if the client cert is optional or required
-    client_auth_requirement = ClientAuthRequirementEnum.DISABLED
-    if tls_detection_result.server_requested_client_cert:
-        if tls_detection_result.tls_version_supported.value >= TlsVersionEnum.TLS_1_3.value:
-            client_auth_requirement = _detect_client_auth_requirement_with_tls_1_3(
-                server_location=server_location,
-                network_config=network_configuration,
-            )
-        else:
-            client_auth_requirement = _detect_client_auth_requirement_with_tls_1_2_or_below(
-                server_location=server_location,
-                network_config=network_configuration,
-                tls_version=tls_detection_result.tls_version_supported,
-                cipher_list=tls_detection_result.cipher_suite_supported,
-            )
-
-    # Check if ECDH key exchanges are supported, for the elliptic curves plugin
-    if "ECDH" in tls_detection_result.cipher_suite_supported:
-        is_ecdh_key_exchange_supported = True
-    else:
-        is_ecdh_key_exchange_supported = _detect_ecdh_support(
-            server_location=server_location,
-            network_config=network_configuration,
-            tls_version=tls_detection_result.tls_version_supported,
-        )
-
-    # All done with TLS probing
+    # Retorna um resultado "fake" para o SSLyze continuar o fluxo
     return ServerTlsProbingResult(
-        highest_tls_version_supported=tls_detection_result.tls_version_supported,
-        cipher_suite_supported=tls_detection_result.cipher_suite_supported,
-        client_auth_requirement=client_auth_requirement,
-        supports_ecdh_key_exchange=is_ecdh_key_exchange_supported,
+        highest_tls_version_supported=TlsVersionEnum.TLS_1_2,
+        cipher_suite_supported="OPC-UA",
+        client_auth_requirement=ClientAuthRequirementEnum.DISABLED,
+        supports_ecdh_key_exchange=False,
     )
 
 
