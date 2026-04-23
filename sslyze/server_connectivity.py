@@ -54,24 +54,22 @@ class ServerTlsProbingResult:
 def check_connectivity_to_server(
     server_location: ServerNetworkLocation, network_configuration: ServerNetworkConfiguration
 ) -> ServerTlsProbingResult:
-    """Verifica conectividade com servidor OPC UA."""
-    
-    async def _check():
-        url = f"opc.tcp://{server_location.hostname}:{server_location.port}"
-        client = OpcUaClient(url=url)
-        await client.connect_sessionless()  # conecta sem CreateSession
-        await client.disconnect_sessionless()
+    """Verifica conectividade com servidor OPC UA via socket TCP simples."""
+    import socket
 
     try:
-        asyncio.run(_check())
-    except Exception as e:
+        sock = socket.create_connection(
+            (server_location.hostname, server_location.port),
+            timeout=5,
+        )
+        sock.close()
+    except OSError as e:
         raise ConnectionToServerFailed(
             server_location=server_location,
             network_configuration=network_configuration,
             error_message=f"OPC UA connection failed: {e}",
         )
 
-    # Retorna um resultado "fake" para o SSLyze continuar o fluxo
     return ServerTlsProbingResult(
         highest_tls_version_supported=TlsVersionEnum.TLS_1_2,
         cipher_suite_supported="OPC-UA",

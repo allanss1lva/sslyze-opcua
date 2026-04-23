@@ -63,3 +63,9 @@ venv/
 *.json
 *.html
 __pycache__/
+
+venv/
+venv312/
+__pycache__/
+*.pyc
+.env

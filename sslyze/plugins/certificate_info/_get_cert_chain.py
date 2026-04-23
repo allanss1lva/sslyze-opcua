@@ -15,11 +15,17 @@ ArgumentsToGetCertificateChain = Tuple[
 async def _get_opcua_certificate(hostname: str, port: int):
     url = f"opc.tcp://{hostname}:{port}"
     client = Client(url=url, timeout=5)
-    endpoints = await client.connect_and_get_server_endpoints()
+    
+    try:
+        endpoints = await client.connect_and_get_server_endpoints()
+    except Exception as e:
+        raise ConnectionError(f"Falha ao obter endpoints OPC UA: {e}") from e
+
     for ep in endpoints:
-        cert_der = ep.ServerCertificate
+        cert_der = bytes(ep.ServerCertificate)  # garante conversão correta do tipo
         if cert_der and len(cert_der) > 0:
             return x509.load_der_x509_certificate(cert_der, default_backend())
+    
     raise ValueError("Nenhum certificado encontrado nos endpoints do servidor OPC UA.")
 
 
