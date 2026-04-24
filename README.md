@@ -1,124 +1,223 @@
-SSLyze
-======
+# SSLyze OPC UA — Análise de Certificados X.509 em Servidores OPC UA
 
-![Run Tests](https://github.com/nabla-c0d3/sslyze/workflows/Run%20Tests/badge.svg)
-[![Downloads](https://pepy.tech/badge/sslyze/month)](https://pepy.tech/project/sslyze)
-[![PyPI version](https://img.shields.io/pypi/v/sslyze.svg)](https://pypi.org/project/sslyze/)
-[![Python version](https://img.shields.io/pypi/pyversions/sslyze.svg)](https://pypi.org/project/sslyze/)
+> Adaptação da ferramenta [SSLyze](https://github.com/nabla-c0d3/sslyze) para extração e análise de certificados digitais X.509 em servidores que operam sob o protocolo **OPC UA**, em substituição à camada TLS convencional.
 
-SSLyze is a fast and powerful SSL/TLS scanning tool and Python library.
+Desenvolvido no âmbito do **VIRTUS / LIEC — UFCG** (Universidade Federal de Campina Grande), Abril de 2022.
 
-SSLyze can analyze the SSL/TLS configuration of a server by connecting to it, in order to ensure that it uses strong
-encryption settings (certificate, cipher suites, elliptic curves, etc.), and that it is not vulnerable to known TLS
-attacks (Heartbleed, ROBOT, OpenSSL CCS injection, etc.).
+---
 
-Key features
-------------
+## Sumário
 
-* Focus on speed and reliability: SSLyze is a battle-tested tool that is used to reliably scan **hundreds of thousands**
-of servers every day.
-* Easy to operationalize: SSLyze can be directly run from CI/CD, in order to continuously check a server against 
-Mozilla's recommended TLS configurations.
-* Fully documented [Python API](https://nabla-c0d3.github.io/sslyze/documentation/) to run scans directly from any
-Python application, such as a function deployed to AWS Lambda.
-* Support for scanning non-HTTP servers including SMTP, XMPP, LDAP, POP, IMAP, RDP, Postgres and FTP servers.
-* Results of a scan can easily be saved to a JSON file for later processing.
-* And much more!
+- [Visão Geral](#visão-geral)
+- [Motivação](#motivação)
+- [Arquitetura das Modificações](#arquitetura-das-modificações)
+- [Pré-requisitos](#pré-requisitos)
+- [Instalação e Configuração](#instalação-e-configuração)
+- [Uso](#uso)
+- [Resultados Esperados](#resultados-esperados)
+- [Validação](#validação)
+- [Limitações Conhecidas](#limitações-conhecidas)
+- [Referências](#referências)
 
-Quick start
------------
+---
 
-On Windows, Linux (x86 or x64) and macOS, SSLyze can be installed directly via pip:
+## Visão Geral
+
+Este projeto adapta o **SSLyze 6.3.1** — ferramenta de análise de servidores TLS/SSL — para inspecionar certificados X.509 em servidores **OPC UA** (Open Platform Communications Unified Architecture). A comunicação TLS é substituída por conexões TCP simples combinadas ao serviço `GetEndpoints` do protocolo OPC UA, via biblioteca `asyncua`.
 
 ```
-$ pip install --upgrade pip setuptools wheel
-$ pip install --upgrade sslyze
-$ python -m sslyze www.yahoo.com www.google.com "[2607:f8b0:400a:807::2004]:443"
+SSLyze Original          →    SSLyze OPC UA (este repositório)
+──────────────────────────────────────────────────────────────
+Conexão TLS (nassl)      →    Conexão TCP simples (socket)
+Certificado via TLS      →    Certificado via GetEndpoints (asyncua)
+Análise de suítes TLS    →    Análise de certificados X.509 OPC UA
 ```
 
-It can also be used via Docker:
+---
+
+## Motivação
+
+Ferramentas clássicas de análise de segurança, como o SSLyze, não suportam nativamente o protocolo OPC UA — amplamente utilizado em ambientes de automação industrial (Indústria 4.0). Ao executar o SSLyze padrão contra um servidor OPC UA, o scanner falha com a mensagem:
 
 ```
-$ docker run --rm -it nablac0d3/sslyze:6.1.0 www.google.com
+=> ERROR: TLS probing failed: could not find a TLS version and cipher suite
+   supported by the server; discarding scan.
 ```
 
-Lastly, a pre-compiled Windows executable can be downloaded from [the Releases
-page](https://github.com/nabla-c0d3/sslyze/releases).
+Este projeto resolve essa limitação, permitindo que a lógica de análise de certificados do SSLyze seja reaproveitada para contextos industriais baseados em OPC UA.
 
-Python API Documentation
-------------------------
+---
 
-A sample script describing how to use the SSLyze's Python API is available at [./api_sample.py](https://github.com/nabla-c0d3/sslyze/blob/release/api_sample.py).
+## Arquitetura das Modificações
 
-Full documentation for SSLyze's Python API is [available here][documentation].
+Dois arquivos do código-fonte do SSLyze foram alterados:
 
-Usage as a CI/CD step
----------------------
+### `sslyze/server_connectivity.py`
 
-By default, SSLyze will check the server's scan results against Mozilla's recommended ["intermediate" TLS
-configuration](https://wiki.mozilla.org/Security/Server_Side_TLS), and will return a non-zero exit code if the server
-is not compliant. 
+A função `check_connectivity_to_server()` foi substituída por uma verificação de conectividade via **socket TCP simples**, testando apenas se a porta do servidor está acessível:
 
-```
-$ python -m sslyze mozilla.com
-```
-```
-Checking results against Mozilla's "intermediate" configuration. See https://ssl-config.mozilla.org/ for more details.
-
-mozilla.com:443: OK - Compliant.
-```
-
-The Mozilla configuration to check against can be configured via `--mozilla_config={old, intermediate, modern}`:
-```
-$ python -m sslyze --mozilla_config=modern mozilla.com
-```
-```
-Checking results against Mozilla's "modern" configuration. See https://ssl-config.mozilla.org/ for more details.
-
-mozilla.com:443: FAILED - Not compliant.
-    * certificate_types: Deployed certificate types are {'rsa'}, should have at least one of {'ecdsa'}.
-    * certificate_signatures: Deployed certificate signatures are {'sha256WithRSAEncryption'}, should have at least one of {'ecdsa-with-SHA512', 'ecdsa-with-SHA256', 'ecdsa-with-SHA384'}.
-    * tls_versions: TLS versions {'TLSv1.2'} are supported, but should be rejected.
-    * ciphers: Cipher suites {'TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384', 'TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256', 'TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256'} are supported, but should be rejected.
+```python
+def check_connectivity_to_server(
+    server_location: ServerNetworkLocation,
+    network_configuration: ServerNetworkConfiguration
+) -> ServerTlsProbingResult:
+    import socket
+    try:
+        sock = socket.create_connection(
+            (server_location.hostname, server_location.port),
+            timeout=5,
+        )
+        sock.close()
+    except OSError as e:
+        raise ConnectionToServerFailed(
+            server_location=server_location,
+            network_configuration=network_configuration,
+            error_message=f"OPC UA connection failed: {e}",
+        )
+    return ServerTlsProbingResult(
+        highest_tls_version_supported=TlsVersionEnum.TLS_1_2,
+        cipher_suite_supported="OPC-UA",
+        client_auth_requirement=ClientAuthRequirementEnum.DISABLED,
+        supports_ecdh_key_exchange=False,
+    )
 ```
 
-Alternatively, you can check against your own custom TLS configuration by providing a JSON file that follows Mozilla's TLS configuration format:
+### `sslyze/plugins/certificate_info/_get_cert_chain.py`
 
-```
-$ python -m sslyze --custom_tls_config custom_tls_config_example.json mozilla.com
-```
-```
-Checking results against custom TLS configuration.
+A função `get_certificate_chain()` foi reescrita para obter o certificado diretamente dos **endpoints OPC UA** usando `asyncua`, em vez de uma conexão nassl/TLS:
 
-mozilla.com:443: OK - Compliant.
-```
+```python
+async def _get_opcua_certificate(hostname: str, port: int):
+    url = f"opc.tcp://{hostname}:{port}"
+    client = Client(url=url, timeout=5)
+    try:
+        endpoints = await client.connect_and_get_server_endpoints()
+    except Exception as e:
+        raise ConnectionError(f"Falha ao obter endpoints OPC UA: {e}") from e
 
-See `custom_tls_config_example.json` for an example a custom TLS configuration that can be used by SSLyze.
+    for ep in endpoints:
+        cert_der = bytes(ep.ServerCertificate)
+        if cert_der and len(cert_der) > 0:
+            return x509.load_der_x509_certificate(cert_der, default_backend())
 
-**This functionality can be used to easily run an SSLyze scan as a CI/CD step in order to ensure TLS compliance.**
-
-Development environment
------------------------
-
-To setup a development environment:
-
-```
-$ pip install --upgrade pip setuptools wheel
-$ pip install -e . 
-$ pip install -r requirements-dev.txt
+    raise ValueError("Nenhum certificado encontrado nos endpoints do servidor OPC UA.")
 ```
 
-The tests can then be run using:
+---
+
+## Pré-requisitos
+
+- **Python 3.12** (versões mais recentes apresentam incompatibilidades com `asyncua`)
+- **Git**
+- **winget** (Windows) ou equivalente para instalação do Python
+- Servidor OPC UA em execução (ex.: [Prosys OPC UA Simulation Server](https://prosysopc.com/products/opc-ua-simulation-server/))
+
+---
+
+## Instalação e Configuração
+
+### 1. Clone o repositório
+
+```bash
+git clone https://github.com/allanss1lva/sslyze-opcua
+cd sslyze-opcua
+```
+
+### 2. Instale o Python 3.12
+
+```bash
+winget install Python.Python.3.12
+```
+
+### 3. Crie e ative o ambiente virtual
+
+```bash
+py -3.12 -m venv venv
+venv\Scripts\activate.bat
+```
+
+### 4. Instale as dependências
+
+```bash
+pip install --upgrade pip setuptools wheel
+pip install -e .
+pip install asyncua
+```
+
+---
+
+## Uso
+
+Com o servidor OPC UA em execução, execute:
+
+```bash
+sslyze --certinfo <HOSTNAME_OU_IP>:<PORTA>
+```
+
+**Exemplo:**
+
+```bash
+sslyze --certinfo Virtus-PC0283:53530
+```
+
+> Substitua `Virtus-PC0283:53530` pelo endereço e porta do seu servidor OPC UA (visível na aba **Status** do Prosys ou equivalente).
+
+---
+
+## Resultados Esperados
+
+Uma execução bem-sucedida retorna informações do certificado X.509 do servidor, por exemplo:
 
 ```
-$ invoke test
+SCAN RESULTS FOR VIRTUS-PC0283:53530
+─────────────────────────────────────────────────────
+
+* Certificates Information:
+    Hostname sent for SNI:              Virtus-PC0283
+    Number of cert chains detected:     1 (RSAPublicKey)
+
+    Certificate Chain #1 (RSAPublicKey, SNI enabled)
+        SHA1 Fingerprint:       ee2a927719d926982109424c8fef88ead59d5d06
+        Common Name:            SimulationServer@Virtus-PC0283
+        Issuer:                 SimulationServer@Virtus-PC0283
+        Serial Number:          1773689176746
+        Not Before:             2026-03-16
+        Not After:              2036-03-13
+        Public Key Algorithm:   RSAPublicKey
+        Signature Algorithm:    sha256
+        Key Size:               2048
+        SubjAltName - DNS Names: ['Virtus-PC0283']
+
+SCANS COMPLETED IN 0.300622 S
 ```
 
-License
--------
+---
 
-Copyright (c) 2026 Alban Diquet
+## Validação
 
-SSLyze is made available under the terms of the GNU Affero General Public License (AGPL). See LICENSE.txt for details and exceptions.
+A correção dos dados extraídos pode ser verificada comparando o **número de série** retornado pelo SSLyze com o exibido na aba **Certificates** do Prosys (ou equivalente). No exemplo acima:
 
-[documentation]: https://nabla-c0d3.github.io/sslyze/documentation
+| Fonte      | Número de Série (hex) | Número de Série (decimal) |
+|------------|-----------------------|---------------------------|
+| SSLyze     | `019cf81d02aa`        | `1773689176746`           |
+| Prosys     | `019cf81d02aa`        | `1773689176746`           |
+
+Os valores coincidem, confirmando a extração correta do certificado.
+
+---
+
+## Limitações Conhecidas
+
+- O certificado extraído é **auto-assinado** (Self Signed), portanto não será validado pelas lojas de certificados do sistema operacional (Android, Apple, Java, Mozilla, Windows). Isso é esperado em ambientes OPC UA industriais.
+- Extensões OCSP Must-Staple e Certificate Transparency **não são suportadas** por servidores OPC UA.
+- O scanner retorna `TLS_1_2` e `OPC-UA` como valores fictícios de compatibilidade apenas para satisfazer a interface interna do SSLyze — esses valores não refletem uma negociação TLS real.
+- Testado apenas no Windows. Adaptações podem ser necessárias para Linux/macOS.
+
+---
+
+## Referências
+
+- [SSLyze — repositório original](https://github.com/nabla-c0d3/sslyze)
+- [asyncua — Python OPC UA library](https://github.com/FreeOpcUa/opcua-asyncio)
+- [Prosys OPC UA Simulation Server](https://prosysopc.com/products/opc-ua-simulation-server/)
+- VIRTUS / LIEC — UFCG, *Explorando SSLyze: Etapa 1 a 8*, Campina Grande, Abril de 2022.
