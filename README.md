@@ -2,7 +2,7 @@
 
 > Adaptação da ferramenta [SSLyze](https://github.com/nabla-c0d3/sslyze) para extração e análise de certificados digitais X.509 em servidores que operam sob o protocolo **OPC UA**, em substituição à camada TLS convencional.
 
-Desenvolvido no âmbito do **UFCG** (Universidade Federal de Campina Grande) - Desenvolvido por Allan de Souza Silva e Lívia Maria Leal, Abril de 2022.
+Desenvolvido no âmbito do **UFCG** (Universidade Federal de Campina Grande) - Desenvolvido por Allan de Souza Silva e Lívia Maria Leal, Abril de 2026.
 
 ---
 
@@ -217,4 +217,4 @@ Os valores coincidem, confirmando a extração correta do certificado.
 - [SSLyze — repositório original](https://github.com/nabla-c0d3/sslyze)
 - [asyncua — Python OPC UA library](https://github.com/FreeOpcUa/opcua-asyncio)
 - [Prosys OPC UA Simulation Server](https://prosysopc.com/products/opc-ua-simulation-server/)
-- UFCG, *Explorando SSLyze: Etapa 1 a 8*, Campina Grande, Abril de 2022.
+- UFCG, *Explorando SSLyze: Etapa 1 a 8*, Campina Grande, Abril de 2026.
