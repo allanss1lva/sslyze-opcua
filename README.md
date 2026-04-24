@@ -2,7 +2,7 @@
 
 > Adaptação da ferramenta [SSLyze](https://github.com/nabla-c0d3/sslyze) para extração e análise de certificados digitais X.509 em servidores que operam sob o protocolo **OPC UA**, em substituição à camada TLS convencional.
 
-Desenvolvido no âmbito do **VIRTUS / LIEC — UFCG** (Universidade Federal de Campina Grande) - Desenvolvido por Allan de Souza Silva e Lívia Maria Leal, Abril de 2022.
+Desenvolvido no âmbito do **UFCG** (Universidade Federal de Campina Grande) - Desenvolvido por Allan de Souza Silva e Lívia Maria Leal, Abril de 2022.
 
 ---
 
@@ -157,10 +157,10 @@ sslyze --certinfo <HOSTNAME_OU_IP>:<PORTA>
 **Exemplo:**
 
 ```bash
-sslyze --certinfo Virtus-PC0283:53530
+sslyze --certinfo PC0283:53530
 ```
 
-> Substitua `Virtus-PC0283:53530` pelo endereço e porta do seu servidor OPC UA (visível na aba **Status** do Prosys ou equivalente).
+> Substitua `PC0283:53530` pelo endereço e porta do seu servidor OPC UA (visível na aba **Status** do Prosys ou equivalente).
 
 ---
 
@@ -169,24 +169,24 @@ sslyze --certinfo Virtus-PC0283:53530
 Uma execução bem-sucedida retorna informações do certificado X.509 do servidor, por exemplo:
 
 ```
-SCAN RESULTS FOR VIRTUS-PC0283:53530
+SCAN RESULTS FOR PC0283:53530
 ─────────────────────────────────────────────────────
 
 * Certificates Information:
-    Hostname sent for SNI:              Virtus-PC0283
+    Hostname sent for SNI:              PC0283
     Number of cert chains detected:     1 (RSAPublicKey)
 
     Certificate Chain #1 (RSAPublicKey, SNI enabled)
         SHA1 Fingerprint:       ee2a927719d926982109424c8fef88ead59d5d06
-        Common Name:            SimulationServer@Virtus-PC0283
-        Issuer:                 SimulationServer@Virtus-PC0283
+        Common Name:            SimulationServer@PC0283
+        Issuer:                 SimulationServer@PC0283
         Serial Number:          1773689176746
         Not Before:             2026-03-16
         Not After:              2036-03-13
         Public Key Algorithm:   RSAPublicKey
         Signature Algorithm:    sha256
         Key Size:               2048
-        SubjAltName - DNS Names: ['Virtus-PC0283']
+        SubjAltName - DNS Names: ['PC0283']
 
 SCANS COMPLETED IN 0.300622 S
 ```
@@ -217,4 +217,4 @@ Os valores coincidem, confirmando a extração correta do certificado.
 - [SSLyze — repositório original](https://github.com/nabla-c0d3/sslyze)
 - [asyncua — Python OPC UA library](https://github.com/FreeOpcUa/opcua-asyncio)
 - [Prosys OPC UA Simulation Server](https://prosysopc.com/products/opc-ua-simulation-server/)
-- VIRTUS / LIEC — UFCG, *Explorando SSLyze: Etapa 1 a 8*, Campina Grande, Abril de 2022.
+- UFCG, *Explorando SSLyze: Etapa 1 a 8*, Campina Grande, Abril de 2022.
