@@ -209,9 +209,6 @@ Os valores coincidem, confirmando a extração correta do certificado.
 ## Limitações Conhecidas
 
 - O certificado extraído é **auto-assinado** (Self Signed), portanto não será validado pelas lojas de certificados do sistema operacional (Android, Apple, Java, Mozilla, Windows). Isso é esperado em ambientes OPC UA industriais.
-- Extensões OCSP Must-Staple e Certificate Transparency **não são suportadas** por servidores OPC UA.
-- O scanner retorna `TLS_1_2` e `OPC-UA` como valores fictícios de compatibilidade apenas para satisfazer a interface interna do SSLyze — esses valores não refletem uma negociação TLS real.
-- Testado apenas no Windows. Adaptações podem ser necessárias para Linux/macOS.
 
 ---
 
