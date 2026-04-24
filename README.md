@@ -2,7 +2,7 @@
 
 > Adaptação da ferramenta [SSLyze](https://github.com/nabla-c0d3/sslyze) para extração e análise de certificados digitais X.509 em servidores que operam sob o protocolo **OPC UA**, em substituição à camada TLS convencional.
 
-Desenvolvido no âmbito do **VIRTUS / LIEC — UFCG** (Universidade Federal de Campina Grande) - Desenvolvivo por Allan Souza e Lívia Maria, Abril de 2022.
+Desenvolvido no âmbito do **VIRTUS / LIEC — UFCG** (Universidade Federal de Campina Grande) - Desenvolvido por Allan Souza e Lívia Maria, Abril de 2022.
 
 ---
 
